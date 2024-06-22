@@ -22,9 +22,9 @@
 
 package io.mohamed.resolver.gui;
 
-import io.mohamed.resolver.core.DependencyDownloader;
-import io.mohamed.resolver.core.DependencyResolver;
-import io.mohamed.resolver.core.Util;
+import io.mohamed.resolver.core.resolver.DependencyDownloader;
+import io.mohamed.resolver.core.resolver.DependencyResolver;
+import io.mohamed.resolver.core.util.Util;
 import io.mohamed.resolver.core.callback.DependencyResolverCallback;
 import io.mohamed.resolver.core.callback.FilesDownloadedCallback;
 import io.mohamed.resolver.core.callback.ResolveCallback;
@@ -59,6 +59,8 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.TextField;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -91,20 +93,24 @@ public class DependenciesResolverApplication extends Application implements Init
   public ScrollPane logs;
   // the resolve Button
   public Button resolveBtn;
+  // the copy logs button
+  public Button copyLogsBtn;
   // merge libraries setting value
   private boolean mergeLibraries;
   // the user-defined custom repositories setting value
   private ArrayList<String> repositories;
   // the jarOnly setting value
   private boolean jarOnly;
-  // the filter appinventor dependencies setting value
-  private boolean filterAppinventorDependencies;
   // the verbose setting value
   private boolean verbose;
+  // the jetify libraries setting value
+  private boolean jetifyLibraries;
   // the logs pane
   private Pane logsPane;
   // the primary stage for the application
   private Stage primaryStage;
+  // the logs as a string
+  private String logsStr = "";
 
   public static void main(String[] args) {
     DependenciesResolverApplication.launch(args);
@@ -182,6 +188,12 @@ public class DependenciesResolverApplication extends Application implements Init
             chooseFile.setText(selectedFile[0].getAbsolutePath());
           }
         });
+    copyLogsBtn.setOnMouseClicked((event) -> {
+      final Clipboard clipboard = Clipboard.getSystemClipboard();
+      final ClipboardContent content = new ClipboardContent();
+      content.putString(logsStr);
+      clipboard.setContent(content);
+    });
     resolveBtn.setOnMouseClicked(
         (event -> {
           // clear previous logs
@@ -193,15 +205,15 @@ public class DependenciesResolverApplication extends Application implements Init
           String version = versionTbox.getText();
           boolean gradleDependencyProvided = !gradleDependency.isEmpty();
           boolean artifactInfoProvided =
-              !groupID.isEmpty() && !artifactId.isEmpty() && !version.isEmpty();
+              !groupID.isEmpty() && !artifactId.isEmpty();
           if (!gradleDependencyProvided && !artifactInfoProvided) {
             Alert noDependencyProvidedAlert =
                 new Alert(
                     AlertType.NONE,
-                    "Neither a gradle dependency, nor artifactId, groupId, and version were provided!",
+                    "The dependency's group ID or artifact ID is missing.",
                     ButtonType.OK);
-            noDependencyProvidedAlert.setTitle("No Dependency Provided");
-            noDependencyProvidedAlert.setHeaderText("No Dependency Provided");
+            noDependencyProvidedAlert.setTitle("Missing Artifact Information");
+            noDependencyProvidedAlert.setHeaderText("Missing Artifact Information");
             noDependencyProvidedAlert.show();
             return;
           }
@@ -376,11 +388,10 @@ public class DependenciesResolverApplication extends Application implements Init
                       .setCallback(filesDownloadedCallback)
                       .setDependencyResolverCallback(dependencyResolverCallback)
                       .setDependencies(dependencyList)
-                      .setFilterAppInventorDependencies(filterAppinventorDependencies)
                       .setJarOnly(jarOnly)
                       .setMainDependency(finalDependency)
                       .setMerge(mergeLibraries)
-                      .setVerbose(verbose)
+                      .setJetifyLibraries(jetifyLibraries)
                       .setRepositories(repositories)
                       .resolve();
                 }
@@ -434,15 +445,14 @@ public class DependenciesResolverApplication extends Application implements Init
     repositories =
         (ArrayList<String>)
             SettingsManager.getSettingForKey(SettingsConstants.REPOS_SETTING_KEY).getValue();
-    filterAppinventorDependencies =
-        Boolean.parseBoolean(
-            SettingsManager.getSettingForKey(
-                    SettingsConstants.FILTER_APPINVENTOR_DEPENDENCIES_SETTINGS_KEY)
-                .getValue()
-                .toString());
     verbose =
         Boolean.parseBoolean(
             SettingsManager.getSettingForKey(SettingsConstants.VERBOSE_SETTINGS_KEY)
+                .getValue()
+                .toString());
+    jetifyLibraries =
+        Boolean.parseBoolean(
+            SettingsManager.getSettingForKey(SettingsConstants.JETIFY_SETTINGS_KEY)
                 .getValue()
                 .toString());
   }
@@ -456,7 +466,9 @@ public class DependenciesResolverApplication extends Application implements Init
   public void appendLog(String msg, boolean error) {
     Platform.runLater(
         () -> {
-          Label log = new Label(msg);
+          Label log = new Label();
+          log.setText(msg);
+          logsStr += msg + "\n";
           if (error) {
             log.setTextFill(Color.RED);
             log.setFont(Font.font(null, FontWeight.BOLD, 12));

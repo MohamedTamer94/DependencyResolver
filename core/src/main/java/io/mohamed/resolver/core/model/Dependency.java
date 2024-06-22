@@ -40,12 +40,16 @@ public class Dependency {
   // gradle kotlin implementation syntax
   private static final Pattern GRADLE_KOTLIN_IMPLEMENTATION =
       Pattern.compile("(implementation\\()(['\"])(.*)(['\"]\\))");
+  private static final Pattern GRADLE_LONG_IMPLEMENTATION =
+      Pattern.compile(
+          "implementation group: ['\"](.*)['\"], name: ['\"](.*)['\"], version: ['\"](.*)['\"]");
+  private static final String GRADLE_DEPENDENCY_SEPARATOR = ":";
   // the dependency group id
   private final String groupId;
   // the dependency artifact id
   private final String artifactId;
   // the dependency version
-  private final String version;
+  private String version;
   // the dependency type, defaults to jar
   private String type = "jar";
   // the dependency scope, defaults to compile
@@ -97,26 +101,45 @@ public class Dependency {
     }
   }
 
+  /**
+   * Creates a Dependency class given the string representation. Supported string representations
+   * for artifacts are: <br>
+   * Gradle Groovy Implementations. e.g: <code>implementation 'com.test:test:1.0'`</code> <br>
+   * Gradle Kotlin Implementation. e.g: <code>implementation("com.test:test:1.0")</code> <br>
+   * Long Gradle Implementation. e.g: <code>implementation group: com.test, name: test, version: 1.0
+   * </code>
+   *
+   * @param str the string representation for the dependency
+   * @return the dependency created from the string representation
+   */
   public static Dependency valueOf(String str) {
     Matcher groovyMatcher = GRADLE_GROOVY_IMPLEMENTATION.matcher(str);
     Matcher kotlinMatcher = GRADLE_KOTLIN_IMPLEMENTATION.matcher(str);
+    Matcher gradleLongMatcher = GRADLE_LONG_IMPLEMENTATION.matcher(str);
     String dependencyValue = null;
     if (groovyMatcher.matches()) {
       dependencyValue = groovyMatcher.group(3).trim();
     } else if (kotlinMatcher.matches()) {
       dependencyValue = kotlinMatcher.group(3).trim();
+    } else if (gradleLongMatcher.matches()) {
+      dependencyValue =
+          gradleLongMatcher.group(1).trim()
+              + GRADLE_DEPENDENCY_SEPARATOR
+              + gradleLongMatcher.group(2).trim()
+              + GRADLE_DEPENDENCY_SEPARATOR
+              + gradleLongMatcher.group(3).trim();
     }
     if (dependencyValue != null) {
-      String[] dependenceyPieces = dependencyValue.split(":");
-      if (dependenceyPieces.length >= 2) {
-        String artifactId = dependenceyPieces[0];
-        String groupId = dependenceyPieces[1];
-        String version = dependenceyPieces[2];
+      String[] dependencyPieces = dependencyValue.split(GRADLE_DEPENDENCY_SEPARATOR);
+      if (dependencyPieces.length >= 2) {
+        String artifactId = dependencyPieces[0];
+        String groupId = dependencyPieces[1];
+        String version = dependencyPieces[2];
         return new Dependency(artifactId, groupId, version);
       }
     }
     throw new IllegalArgumentException(
-        "Failed to convert dependnecy string " + str + " to " + Dependency.class.getName());
+        "Failed to convert dependency string " + str + " to " + Dependency.class.getName());
   }
 
   /** @return the dependency artifact id */
@@ -142,6 +165,15 @@ public class Dependency {
   /** @return the dependency version */
   public String getVersion() {
     return version;
+  }
+
+  /**
+   * Changes the dependency version
+   *
+   * @param version the new version
+   */
+  public void setVersion(String version) {
+    this.version = version;
   }
 
   @Override
